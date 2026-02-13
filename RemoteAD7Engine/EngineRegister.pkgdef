@@ -1,0 +1,40 @@
+﻿; This file registers the sample debug engine with Visual Studio.
+; The 'AD7Metrics\Engine\{guid}' section declares capabilities of the engine.
+; Make sure to update the GUID in this file when changing EngineConstants.EngineId
+
+[$RootKey$\AD7Metrics\Engine\{AD700943-CDC3-4DD7-9CF0-18972BEA2ABC}]
+"CLSID"="{AD7056E6-0F4F-4D79-83A5-9AF4A1A7A4B0}"
+"ProgramProvider"="{AD704CA4-6029-48C2-B60E-84E7D6AA4458}"
+"Attach"=dword:00000001
+"AddressBP"=dword:00000000
+"AutoSelectPriority"=dword:00000004
+"CallstackBP"=dword:00000001
+"Name"="Remote Debug Engine"
+
+[$RootKey$\CLSID\{AD7056E6-0F4F-4D79-83A5-9AF4A1A7A4B0}]
+"Assembly"="RemoteAD7Engine"
+"Class"="RemoteAD7Engine.AD7Engine"
+"CodeBase"="$PackageFolder$\RemoteAD7Engine.dll"
+
+[$RootKey$\CLSID\{AD704CA4-6029-48C2-B60E-84E7D6AA4458}]
+"Assembly"="RemoteAD7Engine"
+"Class"="RemoteAD7Engine.AD7ProgramProvider"
+"CodeBase"="$PackageFolder$\RemoteAD7Engine.dll"
+
+; Registers the expression evaluator for the debug engine, specifying its CLSID, language, and associated viewers.
+[$RootKey$\AD7Metrics\ExpressionEvaluator\{3A12D0B7-C26C-11D0-B442-00A0244A1DD2}\{2fcd7913-7a65-4692-8a13-232171ed85df}]
+"CLSID"="{D67D5DB8-3D44-4105-B4B8-47AB1BA66180}"
+"Language"="C++"
+"Name"="Remote Expression Evaluator"
+"AD7AutoTypeViewer"="{AD7056E2-0F4F-4D79-83A5-9AF4A1A7A4B0}"
+"AD7TextTypeViewer"="{AD7056E1-0F4F-4D79-83A5-9AF4A1A7A4B0}"
+
+[$RootKey$\CLSID\{AD7056E2-0F4F-4D79-83A5-9AF4A1A7A4B0}]
+"Assembly"="RemoteAD7Engine"
+"Class"="RemoteAD7Engine.AD7AutoTypeViewer"
+"CodeBase"="$PackageFolder$\RemoteAD7Engine.dll"
+
+[$RootKey$\CLSID\{AD7056E1-0F4F-4D79-83A5-9AF4A1A7A4B0}]
+"Assembly"="RemoteAD7Engine"
+"Class"="RemoteAD7Engine.AD7TextTypeViewer"
+"CodeBase"="$PackageFolder$\RemoteAD7Engine.dll"

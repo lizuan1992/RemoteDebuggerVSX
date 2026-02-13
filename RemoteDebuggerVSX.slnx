@@ -1,0 +1,13 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="arm64" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="RemoteAD7Engine/RemoteAD7Engine.csproj" Id="ad304835-4dba-49f3-a13d-f173bc828ebf" />
+  <Project Path="RemoteDebuggerVSX.csproj" Id="acdf1abb-0652-47db-84a7-f1f6cc9140cb">
+    <Platform Solution="*|arm64" Project="arm64" />
+    <Platform Solution="*|x86" Project="x86" />
+  </Project>
+</Solution>

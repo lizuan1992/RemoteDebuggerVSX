@@ -1,0 +1,1620 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Remote Debugger VSX ? Remote Runtime JSON Protocol</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1f2328;
+      --muted: #57606a;
+      --border: #d0d7de;
+      --code-bg: #f6f8fa;
+      --link: #0969da;
+
+      /* VS-like JSON token palette (light) */
+      --tok-key: #001080;   /* identifier-ish */
+      --tok-keystr: #6f42c1;/* property name (distinct + non-red) */
+      --tok-str: #a31515;   /* string */
+      --tok-num: #098658;   /* number */
+      --tok-lit: #0000ff;   /* keyword/literal */
+      --tok-punc: #6a737d;  /* punctuation */
+
+      --json-bg: #f6f8fa;
+      --json-border: #d0d7de;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --fg: #c9d1d9;
+        --muted: #8b949e;
+        --border: #30363d;
+        --code-bg: #161b22;
+        --link: #58a6ff;
+
+        /* VS-like JSON token palette (dark-ish) */
+        --tok-key: #9cdcfe;
+        --tok-keystr: #d2a8ff;
+        --tok-str: #ce9178;
+        --tok-num: #b5cea8;
+        --tok-lit: #569cd6;
+        --tok-punc: #8b949e;
+
+        --json-bg: #0b1220;
+        --json-border: #30363d;
+      }
+    }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height: 1.55; }
+    header { padding: 18px 20px; border-bottom: 1px solid var(--border); }
+    header h1 { margin: 0 0 6px 0; font-size: 22px; font-weight: 650; }
+    header .sub { color: var(--muted); font-size: 13px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    nav.toc { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 0 0 18px 0; }
+    nav.toc h2 { margin: 0 0 8px 0; font-size: 16px; }
+    nav.toc ul { margin: 0; padding-left: 18px; }
+    nav.toc li { margin: 4px 0; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+    code, pre { font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace; font-size: 12.5px; }
+    code { background: rgba(127,127,127,0.12); padding: 0.1em 0.35em; border-radius: 6px; }
+    pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; overflow: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0 16px 0; }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; vertical-align: top; }
+    th { text-align: left; background: var(--code-bg); }
+    .muted { color: var(--muted); }
+    .badge { display: inline-block; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--muted); }
+    .note { border-left: 3px solid var(--border); padding: 8px 12px; background: var(--code-bg); border-radius: 8px; margin: 10px 0 16px 0; }
+
+    /* JSON highlighting */
+    code.json-colored {
+      background: var(--json-bg);
+      border: 1px solid var(--json-border);
+      padding: 0.12em 0.42em;
+      border-radius: 6px;
+    }
+    pre code.json-colored {
+      display: block;
+      padding: 0;
+      border: none;
+      background: transparent;
+    }
+
+    code.json-colored .tok-keystr { color: var(--tok-keystr); font-weight: 650; }
+    code.json-colored .tok-key { color: var(--tok-key); font-weight: 600; }
+    code.json-colored .tok-str { color: var(--tok-str); }
+    code.json-colored .tok-num { color: var(--tok-num); }
+    code.json-colored .tok-lit { color: var(--tok-lit); font-weight: 600; }
+    code.json-colored .tok-punc { color: var(--tok-punc); }
+    code.json-colored { font-size: 13.5px; }
+    pre code.json-colored { font-size: 13.5px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Remote Debugger VSX ? Remote Runtime JSON Protocol</h1>
+    <div class="sub"><span class="badge">Generated</span> from <code>docs/RemoteProtocol.md</code> by <code>tools/GenerateRemoteProtocolHtml.ps1</code></div>
+  </header>
+  <main>
+    <nav class="toc" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <ul>
+<li><a href="#change-log">Change Log</a></li>
+<li><a href="#contents">Contents</a></li>
+<li><a href="#1-conformance-language">1. Conformance language</a></li>
+<li><a href="#2-scope">2. Scope</a></li>
+<li><a href="#3-transport">3. Transport</a></li>
+<li><a href="#4-message-envelope">4. Message envelope</a></li>
+  <li><a href="#41-requests">4.1 Requests</a></li>
+  <li><a href="#42-responses">4.2 Responses</a></li>
+  <li><a href="#43-events">4.3 Events</a></li>
+<li><a href="#5-error-model">5. Error model</a></li>
+  <li><a href="#51-failure-responses">5.1 Failure responses</a></li>
+  <li><a href="#52-examples-of-failure-message">5.2 Examples of failure `message`</a></li>
+<li><a href="#6-commands">6. Commands</a></li>
+  <li><a href="#61-command-summary">6.1 Command summary</a></li>
+  <li><a href="#62-session-commands">6.2 Session commands</a></li>
+    <li><a href="#621-start">6.2.1 `start`</a></li>
+    <li><a href="#622-ready">6.2.2 `ready`</a></li>
+    <li><a href="#623-stop">6.2.3 `stop`</a></li>
+  <li><a href="#63-run-control-commands">6.3 Run-control commands</a></li>
+    <li><a href="#631-continue">6.3.1 `continue`</a></li>
+    <li><a href="#632-step">6.3.2 `step`</a></li>
+    <li><a href="#633-pause-optional">6.3.3 `pause` (OPTIONAL)</a></li>
+  <li><a href="#64-breakpoint-management">6.4 Breakpoint management</a></li>
+    <li><a href="#641-set_breakpoint">6.4.1 `set_breakpoint`</a></li>
+    <li><a href="#642-remove_breakpoint">6.4.2 `remove_breakpoint`</a></li>
+  <li><a href="#65-inspection-commands-required">6.5 Inspection commands (REQUIRED)</a></li>
+    <li><a href="#651-get_threads">6.5.1 `get_threads`</a></li>
+    <li><a href="#652-get_stack">6.5.2 `get_stack`</a></li>
+    <li><a href="#653-get_scope">6.5.3 `get_scope`</a></li>
+    <li><a href="#654-get_property">6.5.4 `get_property`</a></li>
+    <li><a href="#655-get_evaluation">6.5.5 `get_evaluation`</a></li>
+    <li><a href="#656-set_variable">6.5.6 `set_variable`</a></li>
+<li><a href="#7-events">7. Events</a></li>
+  <li><a href="#71-event-summary">7.1 Event summary</a></li>
+  <li><a href="#72-stopped">7.2 `stopped`</a></li>
+  <li><a href="#73-continued">7.3 `continued`</a></li>
+  <li><a href="#74-program_exited">7.4 `program_exited`</a></li>
+  <li><a href="#75-output">7.5 `output`</a></li>
+  <li><a href="#76-thread_started-thread_exited">7.6 `thread_started` / `thread_exited`</a></li>
+<li><a href="#8-data-conventions">8. Data conventions</a></li>
+  <li><a href="#81-paths-file">8.1 Paths (`file`)</a></li>
+  <li><a href="#82-line-numbers-line">8.2 Line numbers (`line`)</a></li>
+  <li><a href="#83-ids">8.3 Ids</a></li>
+  <li><a href="#84-required-field-policy-and-defaults">8.4 Required-field policy and defaults</a></li>
+  <li><a href="#85-size-field-semantics">8.5 Size field semantics</a></li>
+<li><a href="#9-ordering-state-and-resilience">9. Ordering, state, and resilience</a></li>
+  <li><a href="#91-conceptual-remote-state">9.1 Conceptual remote state</a></li>
+  <li><a href="#92-run-control-serialization-consumer-behavior">9.2 Run-control serialization (consumer behavior)</a></li>
+  <li><a href="#921-run-control-state-matrix-recommended">9.2.1 Run-control state matrix (recommended)</a></li>
+  <li><a href="#93-required-feature-behavior">9.3 Required feature behavior</a></li>
+  <li><a href="#94-responses-vs-events-implementation-guidance">9.4 Responses vs events (implementation guidance)</a></li>
+  <li><a href="#95-forward-compatibility-rules">9.5 Forward-compatibility rules</a></li>
+  <li><a href="#96-timeouts-retries-and-no-response-behavior-not-supported">9.6 Timeouts, retries, and no-response behavior (NOT SUPPORTED)</a></li>
+<li><a href="#10-examples">10. Examples</a></li>
+  <li><a href="#101-start">10.1 Start</a></li>
+  <li><a href="#1011-start-failed-failure-response-example">10.1.1 Start failed (failure response example)</a></li>
+  <li><a href="#102-ready-handshake-no-response">10.2 Ready handshake (no response)</a></li>
+  <li><a href="#103-stop-no-response-required">10.3 Stop (no response required)</a></li>
+  <li><a href="#104-continue">10.4 Continue</a></li>
+  <li><a href="#1041-continue-failed-failure-response-example">10.4.1 Continue failed (failure response example)</a></li>
+  <li><a href="#105-step">10.5 Step</a></li>
+  <li><a href="#1051-step-rejected-failure-response-example">10.5.1 Step rejected (failure response example)</a></li>
+  <li><a href="#106-pause-unsupported">10.6 Pause unsupported</a></li>
+  <li><a href="#1061-pause-success-supported-runtime">10.6.1 Pause success (supported runtime)</a></li>
+  <li><a href="#107-program-exited-event">10.7 Program exited event</a></li>
+  <li><a href="#108-thread-lifetime-events">10.8 Thread lifetime events</a></li>
+  <li><a href="#109-breakpoint-hit">10.9 Breakpoint hit</a></li>
+    <li><a href="#1091-set_breakpoint-success-create-update-examples">10.9.1 set_breakpoint success (create + update examples)</a></li>
+    <li><a href="#1092-set_breakpoint-failed-failure-surface-example">10.9.2 set_breakpoint failed (failure surface example)</a></li>
+    <li><a href="#1093-remove_breakpoint-failed-failure-surface-example">10.9.3 remove_breakpoint failed (failure surface example)</a></li>
+    <li><a href="#1094-exception-stop-example">10.9.4 Exception stop example</a></li>
+  <li><a href="#1010-inspection-command-walkthrough">10.10 Inspection command walkthrough</a></li>
+    <li><a href="#10101-enumerate-threads">10.10.1 Enumerate threads</a></li>
+    <li><a href="#10102-fetch-stack-and-scope">10.10.2 Fetch stack and scope</a></li>
+    <li><a href="#10103-expand-properties">10.10.3 Expand properties</a></li>
+    <li><a href="#101031-expand-array-properties">10.10.3.1 Expand array properties</a></li>
+    <li><a href="#101032-expand-array-properties-with-paging">10.10.3.2 Expand array properties with paging</a></li>
+    <li><a href="#101033-handling-unknown-size-size-0">10.10.3.3 Handling unknown size (size &lt; 0)</a></li>
+    <li><a href="#10104-set-a-variable">10.10.4 Set a variable</a></li>
+    <li><a href="#10105-get-evaluation-an-expression">10.10.5 Get Evaluation an expression</a></li>
+<li><a href="#11-conformance-checklist">11. Conformance checklist</a></li>
+  <li><a href="#111-general">11.1 General</a></li>
+  <li><a href="#112-run-control">11.2 Run-control</a></li>
+  <li><a href="#113-breakpoints">11.3 Breakpoints</a></li>
+  <li><a href="#114-inspection-required">11.4 Inspection (REQUIRED)</a></li>
+<li><a href="#12-implementation-guidelines">12. Implementation Guidelines</a></li>
+  <li><a href="#121-performance-considerations">12.1 Performance considerations</a></li>
+  <li><a href="#122-error-handling-best-practices">12.2 Error handling best practices</a></li>
+  <li><a href="#123-state-management">12.3 State management</a></li>
+  <li><a href="#124-compatibility-and-extensibility">12.4 Compatibility and extensibility</a></li>
+</ul>
+
+    </nav>
+    <h1 id="remote-debugger-vsx-remote-runtime-json-protocol">Remote Debugger VSX ⇄ Remote Runtime JSON Protocol</h1>
+<p><strong>Version</strong>: 1.0</p>
+<p><strong>Status</strong>: publish-ready</p>
+<p>&gt; HTML version: <code>docs/RemoteProtocol.html</code> (generated). Regenerate with:</p>
+<p>&gt;</p>
+<p>&gt; <code>powershell -NoProfile -ExecutionPolicy Bypass -File tools/GenerateRemoteProtocolHtml.ps1</code></p>
+<p>This document specifies the <strong>JSON Lines</strong> protocol between the Visual Studio extension (<strong>VSX</strong>) and the <strong>Remote runtime</strong>.</p>
+<hr />
+<h2 id="change-log">Change Log</h2>
+<ul>
+  <li><strong>v1.0</strong>: Initial release of the Remote Debugger VSX ↔ Remote Runtime JSON Protocol specification.</li>
+</ul>
+<hr />
+<h2 id="contents">Contents</h2>
+<ul>
+  <li><a href="#1-conformance-language">1. Conformance language</a></li>
+  <li><a href="#2-scope">2. Scope</a></li>
+  <li><a href="#3-transport">3. Transport</a></li>
+  <li><a href="#4-message-envelope">4. Message envelope</a></li>
+  <li><a href="#5-error-model">5. Error model</a></li>
+  <li><a href="#6-commands">6. Commands</a></li>
+  <li><a href="#61-command-summary">6.1 Command summary</a></li>
+  <li><a href="#62-session-commands">6.2 Session commands</a></li>
+  <li><a href="#621-start">6.2.1 <code>start</code></a></li>
+  <li><a href="#622-ready">6.2.2 <code>ready</code></a></li>
+  <li><a href="#623-stop">6.2.3 <code>stop</code></a></li>
+  <li><a href="#63-run-control-commands">6.3 Run-control commands</a></li>
+  <li><a href="#631-continue">6.3.1 <code>continue</code></a></li>
+  <li><a href="#632-step">6.3.2 <code>step</code></a></li>
+  <li><a href="#633-pause-optional">6.3.3 <code>pause</code> (OPTIONAL)</a></li>
+  <li><a href="#64-breakpoint-management">6.4 Breakpoint management</a></li>
+  <li><a href="#641-set_breakpoint">6.4.1 <code>set_breakpoint</code></a></li>
+  <li><a href="#642-remove_breakpoint">6.4.2 <code>remove_breakpoint</code></a></li>
+  <li><a href="#65-inspection-commands-required">6.5 Inspection commands (REQUIRED)</a></li>
+  <li><a href="#651-get_threads">6.5.1 <code>get_threads</code></a></li>
+  <li><a href="#652-get_stack">6.5.2 <code>get_stack</code></a></li>
+  <li><a href="#653-get_scope">6.5.3 <code>get_scope</code></a></li>
+  <li><a href="#654-get_property">6.5.4 <code>get_property</code></a></li>
+  <li><a href="#655-get_evaluation">6.5.5 <code>get_evaluation</code></a></li>
+  <li><a href="#656-set_variable">6.5.6 <code>set_variable</code></a></li>
+  <li><a href="#7-events">7. Events</a></li>
+  <li><a href="#71-event-summary">7.1 Event summary</a></li>
+  <li><a href="#72-stopped">7.2 <code>stopped</code></a></li>
+  <li><a href="#73-continued">7.3 <code>continued</code></a></li>
+  <li><a href="#74-program_exited">7.4 <code>program_exited</code></a></li>
+  <li><a href="#75-output">7.5 <code>output</code></a></li>
+  <li><a href="#76-thread_started--thread_exited">7.6 <code>thread_started</code> / <code>thread_exited</code></a></li>
+  <li><a href="#8-data-conventions">8. Data conventions</a></li>
+  <li><a href="#9-ordering-state-and-resilience">9. Ordering, state, and resilience</a></li>
+  <li><a href="#10-examples">10. Examples</a></li>
+  <li><a href="#11-conformance-checklist">11. Conformance checklist</a></li>
+  <li><a href="#111-general">11.1 General</a></li>
+  <li><a href="#112-run-control">11.2 Run-control</a></li>
+  <li><a href="#113-breakpoints">11.3 Breakpoints</a></li>
+  <li><a href="#114-inspection-required">11.4 Inspection (REQUIRED)</a></li>
+  <li><a href="#12-implementation-guidelines">12. Implementation Guidelines</a></li>
+</ul>
+<hr />
+<h2 id="1-conformance-language">1. Conformance language</h2>
+<p>The key words <strong>MUST</strong>, <strong>MUST NOT</strong>, <strong>SHOULD</strong>, <strong>SHOULD NOT</strong>, and <strong>MAY</strong> are to be interpreted as described in RFC 2119.</p>
+<hr />
+<h2 id="2-scope">2. Scope</h2>
+<ul>
+  <li>This document is the <strong>only</strong> externally relevant contract for the Remote runtime implementer.</li>
+  <li>The Remote runtime treats the Visual Studio side as a single protocol consumer (VSX).</li>
+  <li>Implementation details inside the Visual Studio side (internal components/notifications) are intentionally <strong>out of scope</strong>.</li>
+</ul>
+<hr />
+<h2 id="3-transport">3. Transport</h2>
+<ul>
+  <li>Framing is <strong>JSON Lines</strong>: one JSON object per line.</li>
+  <li>Encoding MUST be UTF-8.</li>
+  <li>Each message MUST be terminated by <code>\n</code>.</li>
+  <li>Receivers SHOULD tolerate <code>\r\n</code>.</li>
+</ul>
+<p>Operational recommendations:</p>
+<ul>
+  <li>Flush after each line.</li>
+  <li>Keep message size reasonable (e.g., &lt; 1MB per line) to avoid UI lag.</li>
+</ul>
+<hr />
+<h2 id="4-message-envelope">4. Message envelope</h2>
+<p>Every message MUST be a single JSON object and MUST contain:</p>
+<ul>
+  <li><code>type</code>: <code>&quot;request&quot;</code> | <code>&quot;response&quot;</code> | <code>&quot;event&quot;</code></li>
+</ul>
+<h3 id="41-requests">4.1 Requests</h3>
+<p>Requests MUST contain:</p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Description </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>type</code></td>
+    <td>string</td>
+    <td>Always <code>&quot;request&quot;</code> </td>
+  </tr>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td>Command name </td>
+  </tr>
+  <tr>
+    <td> <code>seq</code></td>
+    <td>integer</td>
+    <td>VSX-generated correlation id </td>
+  </tr>
+  </tbody>
+</table>
+<p>Notes:</p>
+<ul>
+  <li><code>seq</code> SHOULD be monotonically increasing for the lifetime of a connection.</li>
+  <li>On a new connection (reconnect), <code>seq</code> MAY restart (e.g., from <code>1</code>).</li>
+  <li>Within a single connection, if a remote detects a duplicate <code>seq</code> still considered in-flight, it SHOULD respond <code>success=false</code> with a descriptive <code>message</code>.</li>
+</ul>
+<h3 id="42-responses">4.2 Responses</h3>
+<p>Responses MUST contain (minimum schema):</p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Description </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>type</code></td>
+    <td>string</td>
+    <td>Always <code>&quot;response&quot;</code> </td>
+  </tr>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td>Same command name as request </td>
+  </tr>
+  <tr>
+    <td> <code>success</code></td>
+    <td>boolean</td>
+    <td><code>true</code> or <code>false</code> </td>
+  </tr>
+  <tr>
+    <td> <code>requestSeq</code></td>
+    <td>integer</td>
+    <td>Echo of request <code>seq</code> </td>
+  </tr>
+  <tr>
+    <td> <code>message</code></td>
+    <td>string</td>
+    <td>REQUIRED when <code>success=false</code>; OPTIONAL when <code>success=true</code> (consumers ignore it on success). </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Important consumer behavior</strong>:</p>
+<ul>
+  <li>If the VSX-side consumer receives <code>success=false</code> without a non-empty <code>message</code>, it may treat the response as invalid and ignore it.</li>
+</ul>
+<p>-- When <code>success=false</code>, missing any required envelope or command-required field makes the response schema-invalid.</p>
+<ul>
+  <li>When <code>success=true</code>, missing any required envelope or command-required field makes the response schema-invalid.</li>
+  <li>Extra/unknown fields MUST NOT cause rejection; consumers ignore fields they do not care about.</li>
+</ul>
+<p>Protocol requirement:</p>
+<ul>
+  <li>If <code>success=false</code>, producers MUST include a non-empty <code>message</code>. If any required field for the command or envelope is missing, the consumer may treat the response as schema-invalid. Extra/unknown fields are allowed; consumers ignore them.</li>
+</ul>
+<p>Notes:</p>
+<ul>
+  <li>Responses MAY include additional command-specific fields beyond the envelope fields listed above.</li>
+  <li>For failure responses, <code>message</code> SHOULD explain the failure in human-readable form.</li>
+  <li><code>message</code> is display-only and MUST NOT be parsed for program logic or feature detection.</li>
+</ul>
+<h3 id="43-events">4.3 Events</h3>
+<p>Events MUST contain:</p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Description </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>type</code></td>
+    <td>string</td>
+    <td>Always <code>&quot;event&quot;</code> </td>
+  </tr>
+  <tr>
+    <td> <code>event</code></td>
+    <td>string</td>
+    <td>Event name </td>
+  </tr>
+  </tbody>
+</table>
+<hr />
+<h2 id="5-error-model">5. Error model</h2>
+<h3 id="51-failure-responses">5.1 Failure responses</h3>
+<p>For any response with <code>success=false</code>:</p>
+<ul>
+  <li><code>message</code> MUST be present (non-empty string).</li>
+</ul>
+<p><code>message</code> is a human-readable description intended to be shown to the user (e.g., in VS Output window).</p>
+<p>It is not a machine-parseable field and has no required format beyond being a non-empty string.</p>
+<h3 id="52-examples-of-failure-message">5.2 Examples of failure <code>message</code></h3>
+<ul>
+  <li><code>&quot;unsupported&quot;</code></li>
+  <li><code>&quot;invalid state: program exited&quot;</code></li>
+  <li><code>&quot;file not found: C:/repo/app/Missing.cs&quot;</code></li>
+  <li><code>&quot;invalid arguments: missing line&quot;</code></li>
+</ul>
+<hr />
+<h2 id="6-commands">6. Commands</h2>
+<p>All commands are <code>type=&quot;request&quot;</code> messages emitted by VSX. Responses (when required) are single <code>type=&quot;response&quot;</code> lines from the remote runtime. Optional features MAY be omitted entirely (see &#167;6.5).</p>
+<h3 id="61-command-summary">6.1 Command summary</h3>
+<table>
+  <thead><tr>
+    <th> Command</th>
+    <th>Category</th>
+    <th>Response policy</th>
+    <th>Expected events / notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>start</code></td>
+    <td>Session</td>
+    <td>Respond with <code>success</code> (<code>true/false</code>).</td>
+    <td>No specific event required; VSX typically follows with <code>continue</code>/inspection commands. </td>
+  </tr>
+  <tr>
+    <td> <code>ready</code></td>
+    <td>Session</td>
+    <td><strong>No response.</strong> Fire-and-forget handshake.</td>
+    <td>Remote MAY treat it as &quot;VSX is ready&quot;; all initial breakpoint state has been sent and execution can formally begin. </td>
+  </tr>
+  <tr>
+    <td> <code>stop</code></td>
+    <td>Session</td>
+    <td><strong>No response.</strong> VSX disconnects immediately.</td>
+    <td>Remote MAY emit <code>program_exited</code> later if the debuggee quits for its own reasons. </td>
+  </tr>
+  <tr>
+    <td> <code>continue</code></td>
+    <td>Run-control</td>
+    <td>Respond with <code>success</code>.</td>
+    <td>Emit <code>event=continued</code> with the resumed <code>threadId</code>. </td>
+  </tr>
+  <tr>
+    <td> <code>step</code></td>
+    <td>Run-control</td>
+    <td>Respond with <code>success</code>.</td>
+    <td>Emit <code>event=stopped</code> with <code>reason=&quot;step&quot;</code>. </td>
+  </tr>
+  <tr>
+    <td> <code>pause</code> (OPTIONAL)</td>
+    <td>Run-control</td>
+    <td>Respond with <code>success</code> (or <code>success=false</code> + <code>message:&quot;unsupported&quot;</code>).</td>
+    <td>Breaks <strong>all</strong> threads (no <code>threadId</code>); emit <code>event=stopped</code> with <code>reason=&quot;pause&quot;</code> when supported. </td>
+  </tr>
+  <tr>
+    <td> <code>set_breakpoint</code></td>
+    <td>Breakpoint mgmt</td>
+    <td><strong>No response.</strong> Fire-and-forget.</td>
+    <td>Reflect changes via <code>breakpoint_changed</code> events. Emit <code>event=output</code> for failures. </td>
+  </tr>
+  <tr>
+    <td> <code>remove_breakpoint</code></td>
+    <td>Breakpoint mgmt</td>
+    <td><strong>No response.</strong> Fire-and-forget.</td>
+    <td>Emit <code>event=output</code> (e.g., warn) when removal fails. </td>
+  </tr>
+  <tr>
+    <td> <code>get_threads</code></td>
+    <td>Inspection (REQUIRED)</td>
+    <td>Respond with <code>success</code> and <code>threads[]</code>.</td>
+    <td>VSX may emit follow-up inspection commands based on the payload. </td>
+  </tr>
+  <tr>
+    <td> <code>get_stack</code></td>
+    <td>Inspection (REQUIRED)</td>
+    <td>Respond with <code>success</code>, <code>threadId</code>, and <code>frames[]</code>.</td>
+    <td>Emit <code>event=output</code> on schema violations. </td>
+  </tr>
+  <tr>
+    <td> <code>get_scope</code></td>
+    <td>Inspection (REQUIRED)</td>
+    <td>Respond with <code>success</code>, <code>threadId</code>, <code>frameId</code>, <code>variables[]</code>.</td>
+    <td>Returns in-scope variables for a frame (only while stopped). </td>
+  </tr>
+  <tr>
+    <td> <code>get_property</code></td>
+    <td>Inspection (REQUIRED)</td>
+    <td>Respond with <code>success</code>, <code>threadId</code>, <code>frameId</code>, <code>addr</code>, <code>typeId</code>, <code>start</code>, <code>count</code>, <code>size</code>, <code>properties[]</code>.</td>
+    <td>Expands a variable&#39;s members (only while stopped). </td>
+  </tr>
+  <tr>
+    <td> <code>get_evaluation</code></td>
+    <td>Inspection (REQUIRED)</td>
+    <td>Respond with <code>success</code>, evaluation details.</td>
+    <td>If the result has children, VSX will issue <code>get_property</code> for the returned handle.</td>
+  </tr>
+  <tr>
+    <td> <code>set_variable</code></td>
+    <td>Inspection (REQUIRED)</td>
+    <td>Respond with <code>success</code>, <code>threadId</code>, <code>frameId</code>, <code>addr</code>, <code>typeId</code>.</td>
+    <td>Writes a variable value (only while stopped). </td>
+  </tr>
+  </tbody>
+</table>
+<h3 id="62-session-commands">6.2 Session commands</h3>
+<p>Session commands manage the connection lifecycle between VSX and the remote runtime.</p>
+<h4 id="621-start">6.2.1 <code>start</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td>Always <code>&quot;start&quot;</code> .</td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li>Respond with <code>success</code> (<code>true/false</code>).</li>
+  <li>Include a descriptive <code>message</code> when <code>success=false</code>.</li>
+</ul>
+<p><strong>Semantics</strong></p>
+<ul>
+  <li><code>start</code> SHOULD be idempotent (multiple <code>start</code> requests per session are harmless).</li>
+</ul>
+<h4 id="622-ready">6.2.2 <code>ready</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td>Always <code>&quot;ready&quot;</code>. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li><strong>No response.</strong> This is a fire-and-forget notification.</li>
+</ul>
+<p><strong>Semantics</strong></p>
+<ul>
+  <li>Sent immediately after transport setup to signal that VSX finished its initialization and is ready to receive events.</li>
+  <li>Remotes MAY buffer early events until <code>ready</code> arrives; if received late or multiple times, treat it as idempotent.</li>
+  <li>After <code>ready</code>, VSX guarantees that the initial project breakpoint list has been transmitted, so the remote runtime MAY safely start or resume program execution.</li>
+  <li>Runtimes SHOULD NOT emit a response; they MAY emit <code>event=output</code> for diagnostics as needed.</li>
+</ul>
+<h4 id="623-stop">6.2.3 <code>stop</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td>Always <code>&quot;stop&quot;</code> .</td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li><strong>No response.</strong> VSX tears down the transport immediately after sending this request.</li>
+</ul>
+<p><strong>Semantics</strong></p>
+<ul>
+  <li><code>stop</code> simply indicates that VS is leaving debug mode and will disconnect. It does <strong>not</strong> instruct the remote program to exit.</li>
+  <li>Upon receiving <code>stop</code>, the remote runtime SHOULD clean up any debugging state (e.g., remove breakpoints, reset caches) and remain ready for a future connection.</li>
+  <li>If the remote program later exits for its own reasons, emit <code>event=program_exited</code> when practical; otherwise no further messages are required after <code>stop</code>.</li>
+</ul>
+<h3 id="63-run-control-commands">6.3 Run-control commands</h3>
+<p>Run-control commands manipulate the execution state of the debuggee after the session handshake is complete.</p>
+<h4 id="631-continue">6.3.1 <code>continue</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Target thread; REQUIRED. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li>Respond with <code>success</code>. Provide a <code>message</code> when rejecting the request (e.g., program already exited).</li>
+</ul>
+<p><strong>Semantics / events</strong></p>
+<ul>
+  <li>On acceptance, emit <code>event=continued</code> with the resumed <code>threadId</code>.</li>
+</ul>
+<h4 id="632-step">6.3.2 <code>step</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Target thread. </td>
+  </tr>
+  <tr>
+    <td> <code>stepKind</code></td>
+    <td>string</td>
+    <td>Forwarded enum name; REQUIRED. </td>
+  </tr>
+  <tr>
+    <td> <code>stepUnit</code></td>
+    <td>string</td>
+    <td>REQUIRED; only source-line stepping is supported. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Allowed values / meanings</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Values</th>
+    <th>Meaning </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>stepKind</code></td>
+    <td><code>&quot;STEP_INTO&quot;</code>, <code>&quot;STEP_OVER&quot;</code>, <code>&quot;STEP_OUT&quot;</code></td>
+    <td>Standard VS step kinds: into current/child call sites; over the current statement; out of the current frame. </td>
+  </tr>
+  <tr>
+    <td> <code>stepUnit</code></td>
+    <td><code>&quot;STEP_LINE&quot;</code></td>
+    <td>Only source-line stepping is supported; instruction-level stepping is not implemented and MUST be rejected. </td>
+  </tr>
+  </tbody>
+</table>
+<p>Notes:</p>
+<ul>
+  <li>Values are passthrough from VS; remotes SHOULD treat unknown or empty values as unsupported and respond <code>success=false</code> with a descriptive <code>message</code>. <code>stepUnit=&quot;STEP_INSTRUCTION&quot;</code> is unsupported and MUST be rejected.</li>
+</ul>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li>Respond with <code>success</code>. Reject with <code>success=false</code> + <code>message</code> when the runtime is not stopped.</li>
+</ul>
+<p><strong>Semantics / events</strong></p>
+<ul>
+  <li>Emit <code>event=stopped</code> with <code>reason=&quot;step&quot;</code> once the operation completes.</li>
+</ul>
+<h4 id="633-pause-optional">6.3.3 <code>pause</code> (OPTIONAL)</h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td>Always <code>&quot;pause&quot;</code>. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li>If supported: respond with <code>success=true</code>.</li>
+  <li>If unsupported: respond with <code>success=false</code> + <code>message:&quot;unsupported&quot;</code>.</li>
+</ul>
+<p><strong>Semantics / events</strong></p>
+<ul>
+  <li>The request instructs the remote runtime to break <strong>all</strong> threads; VSX does not provide a <code>threadId</code>.</li>
+  <li>On success, emit <code>event=stopped</code> with <code>reason=&quot;pause&quot;</code> for each thread that actually stopped (or at minimum one event whose <code>threadId</code> identifies the thread VS should focus). Provide the best-known <code>file</code> path and 1-based <code>line</code>; if no mapping exists, still include the fields using <code>file:&quot;&quot;</code>, <code>line:0</code> to signal &quot;unknown location&quot;.</li>
+  <li>VSX may mark <code>pause</code> as unsupported after a single <code>success=false</code> response.</li>
+</ul>
+<h3 id="64-breakpoint-management">6.4 Breakpoint management</h3>
+<h4 id="641-set_breakpoint">6.4.1 <code>set_breakpoint</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>file</code></td>
+    <td>string</td>
+    <td>Absolute or solution-relative path. </td>
+  </tr>
+  <tr>
+    <td> <code>line</code></td>
+    <td>int</td>
+    <td>1-based line number. </td>
+  </tr>
+  <tr>
+    <td> <code>function</code></td>
+    <td>string</td>
+    <td>Function name; send &quot;&quot; when not applicable. </td>
+  </tr>
+  <tr>
+    <td> <code>functionLineOffset</code></td>
+    <td>int</td>
+    <td>Offset relative to function entry; send <code>0</code> when unused. </td>
+  </tr>
+  <tr>
+    <td> <code>enabled</code></td>
+    <td>bool</td>
+    <td><code>true</code> or <code>false</code>. </td>
+  </tr>
+  <tr>
+    <td> <code>conditionType</code></td>
+    <td>string</td>
+    <td>e.g., &quot;none&quot;, &quot;expression&quot;. </td>
+  </tr>
+  <tr>
+    <td> <code>condition</code></td>
+    <td>string</td>
+    <td>Condition text (send &quot;&quot; when none). </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li><strong>No response.</strong> The remote MUST NOT send a <code>type=response</code> for this command.</li>
+  <li>If the command is ignored entirely (no response, no <code>output</code>), VSX assumes the breakpoint was accepted and will not retry automatically; any failure should therefore be surfaced via <code>event=output</code> so the user can react.</li>
+  <li>Failures SHOULD be surfaced via <code>event=output</code> (typically <code>category:&quot;error&quot;</code>).</li>
+</ul>
+<p><strong>Semantics</strong></p>
+<ul>
+  <li>Used for both create and update scenarios.</li>
+  <li>VSX uses (<code>file</code>,<code>line</code>) as the stable identity; remotes MUST treat that tuple as authoritative when reconciling breakpoint state.</li>
+  <li>Emit <code>breakpoint_changed</code> or other bookkeeping events so VSX can stay in sync.</li>
+</ul>
+<h4 id="642-remove_breakpoint">6.4.2 <code>remove_breakpoint</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>file</code></td>
+    <td>string</td>
+    <td>Canonical absolute or solution-relative path for the breakpoint. </td>
+  </tr>
+  <tr>
+    <td> <code>line</code></td>
+    <td>int</td>
+    <td>1-based line number for the breakpoint. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li><strong>No response.</strong> Errors must be surfaced via <code>event=output</code> (e.g., <code>category:&quot;warn&quot;</code>, <code>output:&quot;remove_breakpoint failed: not found&quot;</code>).</li>
+  <li>If the remote silently ignores this command, VSX will assume the breakpoint was removed and will not resend, so emit an <code>output</code> diagnostic for any failure/mismatch.</li>
+</ul>
+<p><strong>Semantics</strong></p>
+<ul>
+  <li>Requests identify breakpoints by (<code>file</code>,<code>line</code>). If no matching breakpoint exists the remote SHOULD emit a warning via <code>event=output</code> (and remain otherwise silent).</li>
+  <li><code>file</code> and <code>line</code> mirror the canonical location used during <code>set_breakpoint</code>; VSX includes them so the runtime can double-check mismatched state or tolerate race conditions when metadata is stale.</li>
+  <li>Because VSX may reconcile race conditions between <code>remove_breakpoint</code> and in-flight break events by falling back to file/line matching, <strong>every</strong> subsequent <code>event=stopped(reason=&quot;breakpoint&quot;)</code> MUST include the canonical <code>file</code> and 1-based <code>line</code>.</li>
+</ul>
+<h3 id="65-inspection-commands-required">6.5 Inspection commands (REQUIRED)</h3>
+<p>Inspection commands are <strong>required</strong> for proper debugger functionality. If not implemented, VSX will wait indefinitely for responses, potentially causing hangs or timeouts. Runtimes MUST respond to these commands or reject them with <code>success=false</code> + <code>message:&quot;unsupported&quot;</code> to avoid blocking VSX.</p>
+<h4 id="651-get_threads">6.5.1 <code>get_threads</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li>Respond with <code>success</code> plus a <code>threads</code> array.</li>
+</ul>
+<p><strong>Response schema</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>threads</code></td>
+    <td>array</td>
+    <td>Each entry is an object with <code>id:int</code> and <code>name:string</code>. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Common failures</strong></p>
+<ul>
+  <li>Unsupported: <code>success=false</code> + <code>message:&quot;unsupported&quot;</code>.</li>
+</ul>
+<h4 id="652-get_stack">6.5.2 <code>get_stack</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Target thread. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy / schema</strong></p>
+<ul>
+  <li>Respond with <code>success</code>, echo <code>threadId</code>, and include <code>frames[]</code>.</li>
+  <li>Each frame object includes: <code>id</code> (positive int), <code>file</code> (string), <code>line</code> (1-based int), <code>name</code> (string).</li>
+</ul>
+<p><strong>Common failures</strong></p>
+<ul>
+  <li>Thread not found: <code>success=false</code> + descriptive <code>message</code>.</li>
+</ul>
+<h4 id="653-get_scope">6.5.3 <code>get_scope</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Target thread (must be stopped). </td>
+  </tr>
+  <tr>
+    <td> <code>frameId</code></td>
+    <td>int</td>
+    <td>Target frame (must be valid for the thread). </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy / schema</strong></p>
+<ul>
+  <li>Respond with <code>success</code>, echo <code>threadId</code> and <code>frameId</code>, and include <code>variables[]</code>.</li>
+  <li>Each entry in <code>variables</code> is a variable object (<code>name</code>, <code>value</code>, <code>type</code>, <code>typeId</code>, <code>size</code>, and <code>addr</code> fields as produced by the runtime). <code>size != 0</code> means the value is a composite/handle that can be expanded; the runtime does not inline children and relies on VSX to issue <code>get_property</code> when the user expands it in the UI. When the value is array-like, the runtime also includes <code>start</code>, <code>count</code>, <code>size</code>, and an <code>elements[]</code> array of <code class="json-colored"><span class="tok-punc">{</span> addr<span class="tok-punc">,</span> name<span class="tok-punc">,</span> value<span class="tok-punc">,</span> type<span class="tok-punc">,</span> typeId<span class="tok-punc">,</span> size <span class="tok-punc">}</span></code> items; element <code>type</code> is the element type.</li>
+</ul>
+<p><strong>Common failures</strong></p>
+<ul>
+  <li>Frame not found or out of range: <code>success=false</code> + descriptive <code>message</code>.</li>
+</ul>
+<h4 id="654-get_property">6.5.4 <code>get_property</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Target thread (must be stopped). </td>
+  </tr>
+  <tr>
+    <td> <code>frameId</code></td>
+    <td>int</td>
+    <td>Target frame (must be valid for the thread). </td>
+  </tr>
+  <tr>
+    <td> <code>addr</code></td>
+    <td>int64</td>
+    <td>Address/handle of the variable to expand. </td>
+  </tr>
+  <tr>
+    <td> <code>typeId</code></td>
+    <td>int</td>
+    <td>AngelScript type id for the variable. </td>
+  </tr>
+  <tr>
+    <td> <code>start</code></td>
+    <td>int</td>
+    <td>Zero-based start index for paging; only meaningful when pulling arrays. </td>
+  </tr>
+  <tr>
+    <td> <code>count</code></td>
+    <td>int</td>
+    <td>Page size; <code>count&lt;=0</code> returns all children. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy / schema</strong></p>
+<ul>
+  <li>Respond with <code>success</code>, echo <code>threadId</code>, <code>frameId</code>, <code>addr</code>, <code>typeId</code>, <code>start</code>, <code>count</code>, <code>size</code>, and include <code>properties[]</code>.</li>
+  <li><code>size</code> represents the total number of elements/members: for arrays, it&#39;s the array size; for objects, it&#39;s the number of properties. MUST be &gt;= 0 (unknown sizes are not allowed in <code>get_property</code> responses).</li>
+  <li><code>count</code> is the actual number of elements returned in <code>properties[]</code>: for objects, <code>count == size</code>; for arrays, <code>count</code> is the number actually pulled (may be less than requested if at end).</li>
+  <li><code>start</code> is echoed from the request; only meaningful for arrays.</li>
+  <li><code>properties</code> is an array of objects. For object properties, each object is a full variable object with <code>name</code>, <code>value</code>, <code>type</code>, <code>typeId</code>, <code>size</code>, and <code>addr</code> fields. For array elements, each object has <code>addr</code>, <code>name</code>, <code>value</code>, <code>type</code>, <code>typeId</code>, and <code>size</code> fields. To expand an individual element, send another <code>get_property</code> request using the element&#39;s <code>addr</code> and <code>typeId</code>.</li>
+</ul>
+<p><strong>Common failures</strong></p>
+<ul>
+  <li>Invalid frame or state: <code>success=false</code> + descriptive <code>message</code>.</li>
+  <li>Invalid variable address/type: <code>success=false</code> + descriptive <code>message</code>.</li>
+  <li>Invalid <code>start</code> or <code>count</code> values: <code>success=false</code> + <code>message</code> (e.g., &#39;invalid start index&#39;).</li>
+</ul>
+<h4 id="655-get_evaluation">6.5.5 <code>get_evaluation</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>frameId</code></td>
+    <td>int</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>expression</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy / schema</strong></p>
+<ul>
+  <li>Respond with <code>success</code> plus: <code>threadId</code>, <code>frameId</code>, <code>expression</code>, <code>result</code> (single variable object; same shape as <code>get_scope</code> entries).</li>
+</ul>
+<p><strong>Common failures</strong></p>
+<ul>
+  <li>Evaluation error: <code>success=false</code> + descriptive <code>message</code>.</li>
+</ul>
+<p>For <code>get_property</code>, <code>threadId</code> and <code>frameId</code> MUST be present. See &#167;8.3 for remote-issued id validity rules; consumers MUST NOT reject solely based on numeric sign.</p>
+<h4 id="656-set_variable">6.5.6 <code>set_variable</code></h4>
+<p><strong>Request fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>command</code></td>
+    <td>string</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Target thread (must be stopped). </td>
+  </tr>
+  <tr>
+    <td> <code>frameId</code></td>
+    <td>int</td>
+    <td>Target frame (must be valid for the thread). </td>
+  </tr>
+  <tr>
+    <td> <code>addr</code></td>
+    <td>int64</td>
+    <td>Address/handle of the variable to modify. </td>
+  </tr>
+  <tr>
+    <td> <code>typeId</code></td>
+    <td>int</td>
+    <td>AngelScript type id for the variable. </td>
+  </tr>
+  <tr>
+    <td> <code>value</code></td>
+    <td>string</td>
+    <td>New value (string form, parsed per type id). </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Response policy</strong></p>
+<ul>
+  <li>Respond with <code>success</code>, echo <code>threadId</code>, <code>frameId</code>, <code>addr</code>, <code>typeId</code>. When <code>success=false</code>, include a non-empty <code>message</code> explaining the failure (e.g., invalid frame, unsupported type, not stopped).</li>
+  <li>Reject with <code>success=false</code> + <code>message</code> when the variable cannot be set (e.g., invalid frame, unsupported type, not stopped).</li>
+</ul>
+<h2 id="7-events">7. Events</h2>
+<p>Events are <code>type=&quot;event&quot;</code> JSON lines emitted asynchronously by the remote runtime.</p>
+<h3 id="71-event-summary">7.1 Event summary</h3>
+<table>
+  <thead><tr>
+    <th> Event</th>
+    <th>Purpose</th>
+    <th>Key fields</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>stopped</code></td>
+    <td>Communicates a transition into break mode.</td>
+    <td><code>threadId</code>, <code>reason</code>, optional source info.</td>
+    <td>Used for breakpoints, steps, pauses, and exceptions. </td>
+  </tr>
+  <tr>
+    <td> <code>continued</code></td>
+    <td>Indicates the program resumed execution.</td>
+    <td><code>threadId</code>.</td>
+    <td>Typically follows <code>continue</code> or <code>step</code> acknowledgements. </td>
+  </tr>
+  <tr>
+    <td> <code>program_exited</code></td>
+    <td>Signals that the debuggee ended.</td>
+    <td>Optional <code>exitCode</code>.</td>
+    <td>VSX ends the session when observed. </td>
+  </tr>
+  <tr>
+    <td> <code>output</code></td>
+    <td>Streams textual output or warnings/errors.</td>
+    <td><code>output</code>, optional <code>category</code>.</td>
+    <td>Recommended for surfacing breakpoint failures. </td>
+  </tr>
+  <tr>
+    <td> <code>thread_started</code> / <code>thread_exited</code></td>
+    <td>Thread lifetime notifications.</td>
+    <td><code>threadId</code>.</td>
+    <td>Helps VSX keep the thread list fresh. </td>
+  </tr>
+  </tbody>
+</table>
+<h3 id="72-stopped">7.2 <code>stopped</code></h3>
+<p><strong>Fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>event</code></td>
+    <td>string</td>
+    <td>Always &quot;stopped&quot;. </td>
+  </tr>
+  <tr>
+    <td> <code>reason</code></td>
+    <td>string</td>
+    <td>One of &quot;breakpoint&quot;, &quot;step&quot;, &quot;pause&quot;, &quot;exception&quot;. </td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Thread identifier; MUST be present (see &#167;8.3 for validity). </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Additional fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>file</code></td>
+    <td>string</td>
+    <td>REQUIRED. Send the best-known path or &quot;&quot; if unknown. </td>
+  </tr>
+  <tr>
+    <td> <code>line</code></td>
+    <td>int</td>
+    <td>REQUIRED. Send the best-known value or 0 if unknown. </td>
+  </tr>
+  <tr>
+    <td> <code>exceptionName</code></td>
+    <td>string</td>
+    <td>Provide <strong>only</strong> when <code>reason=&quot;exception&quot;</code>. </td>
+  </tr>
+  <tr>
+    <td> <code>exceptionMessage</code></td>
+    <td>string</td>
+    <td>Provide <strong>only</strong> when <code>reason=&quot;exception&quot;</code>. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Consumer notes</strong></p>
+<ul>
+  <li>If <code>threadId</code> is missing, the event is schema-invalid; consumers MAY ignore it.</li>
+  <li>When <code>reason=&quot;breakpoint&quot;</code>, VSX uses the supplied <code>file</code>/<code>line</code> tuple as the breakpoint identity, so remotes MUST always include both fields.</li>
+  <li>For <code>reason=&quot;step&quot;</code> / <code>&quot;pause&quot;</code>, include the common fields (<code>threadId</code>, <code>file</code>, <code>line</code>) so VS can navigate to the current source location.</li>
+  <li>Exception stops (<code>reason=&quot;exception&quot;</code>) must include <code>exceptionName</code> and <code>exceptionMessage</code> in addition to the common fields (see &#167;10.9.4).</li>
+</ul>
+<h3 id="73-continued">7.3 <code>continued</code></h3>
+<p><strong>Fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>event</code></td>
+    <td>string</td>
+    <td>Always <code>&quot;continued&quot;</code>. </td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Thread that resumed; MUST be present (see &#167;8.3 for validity). </td>
+  </tr>
+  </tbody>
+</table>
+<h3 id="74-program_exited">7.4 <code>program_exited</code></h3>
+<p><strong>Fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>event</code></td>
+    <td>string</td>
+    <td>Always &quot;program_exited&quot;. </td>
+  </tr>
+  <tr>
+    <td> <code>exitCode</code></td>
+    <td>int</td>
+    <td>Optional exit code; send <code>0</code> if unknown. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Notes</strong></p>
+<ul>
+  <li>Emit this event whenever the remote program actually ends execution so the consumer can surface the result. It is independent from the <code>stop</code> command.</li>
+</ul>
+<h3 id="75-output">7.5 <code>output</code></h3>
+<p><strong>Fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>event</code></td>
+    <td>string</td>
+    <td>Always &quot;output&quot;. </td>
+  </tr>
+  <tr>
+    <td> <code>output</code></td>
+    <td>string</td>
+    <td>Display text. </td>
+  </tr>
+  <tr>
+    <td> <code>category</code></td>
+    <td>string</td>
+    <td>Optional bucket (e.g., &quot;stdout&quot;, &quot;stderr&quot;, &quot;info&quot;, &quot;warn&quot;, &quot;error&quot;). </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Notes</strong></p>
+<ul>
+  <li>Preserve newline characters inside <code>output</code> if the text spans multiple lines; VSX renders them verbatim.</li>
+  <li><code>category</code> helps VSX route the text (Output window pane, breakpoint warning surface, etc.). When omitted, VSX treats it as general informational output.</li>
+</ul>
+<h3 id="76-thread_started-thread_exited">7.6 <code>thread_started</code> / <code>thread_exited</code></h3>
+<p><strong>Fields</strong></p>
+<table>
+  <thead><tr>
+    <th> Field</th>
+    <th>Type</th>
+    <th>Notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>event</code></td>
+    <td>string</td>
+    <td>Either <code>&quot;thread_started&quot;</code> or <code>&quot;thread_exited&quot;</code>. </td>
+  </tr>
+  <tr>
+    <td> <code>threadId</code></td>
+    <td>int</td>
+    <td>Thread identifier. </td>
+  </tr>
+  </tbody>
+</table>
+<p><strong>Notes</strong></p>
+<h2 id="8-data-conventions">8. Data conventions</h2>
+<h3 id="81-paths-file">8.1 Paths (<code>file</code>)</h3>
+<ul>
+  <li><code>file</code> is a string path.</li>
+  <li>Paths are interpreted in a Windows-centric way.</li>
+  <li>Consumers compare paths case-insensitively.</li>
+  <li>Producers MAY use either <code>\\</code> or <code>/</code> as separators; consumers MUST accept both.</li>
+  <li>Producers MUST send either absolute paths or paths relative to the solution subdirectory (not general relative paths like <code>..</code>). Consumers MUST normalize separators and resolve subdirectory paths within the active solution. General relative paths (e.g., <code>..</code>) are NOT allowed.</li>
+</ul>
+<p>Resolution behavior:</p>
+<ul>
+  <li>VSX resolves incoming <code>file</code> values by normalizing separators and performing a case-insensitive match within the active solution.</li>
+</ul>
+<h3 id="82-line-numbers-line">8.2 Line numbers (<code>line</code>)</h3>
+<ul>
+  <li>All <code>line</code> fields are <strong>1-based</strong>.</li>
+</ul>
+<h3 id="83-ids">8.3 Ids</h3>
+<p><code>threadId</code> and <code>frameId</code> are <strong>opaque identifiers issued by the remote runtime</strong>. Their numeric values MAY be any integer (negative/zero/positive). Consumers MUST treat them as tokens and MUST NOT derive meaning from numeric ordering or sign.</p>
+<p>Validity rules:</p>
+<ul>
+  <li><code>threadId</code>: MUST refer to a currently known thread in the remote runtime. Remotes allocate ids and may reuse them after a thread exits.</li>
+  <li><code>frameId</code>: MUST refer to a valid frame for the specified <code>threadId</code> in the current stop.</li>
+</ul>
+<p>When an id is not valid in the current state, the remote MUST reject the request with <code>success=false</code> and a descriptive <code>message</code> (e.g., <code>&quot;thread not found&quot;</code>, <code>&quot;frame not found&quot;</code>).</p>
+<h3 id="84-required-field-policy-and-defaults">8.4 Required-field policy and defaults</h3>
+<p>Unless explicitly stated otherwise in a command/event schema:</p>
+<ul>
+  <li>Any field listed in a schema table is <strong>required</strong> and MUST be present in the JSON.</li>
+  <li>Producers MUST NOT omit a field to indicate “not applicable”. Instead they MUST send an explicit default value.</li>
+  <li>If a schema explicitly marks a field as OPTIONAL, producers MAY omit it.</li>
+  <li>Extra/unknown fields MUST be tolerated by consumers; they only process fields of interest.</li>
+</ul>
+<p>Default values used by this document when a concept is not applicable:</p>
+<ul>
+  <li><code>int</code>: <code>0</code></li>
+  <li><code>bool</code>: <code>false</code></li>
+  <li><code>string</code>: <code>&quot;&quot;</code></li>
+  <li><code>array</code>: <code class="json-colored"><span class="tok-punc">[</span><span class="tok-punc">]</span></code></li>
+  <li><code>object</code>: <code class="json-colored"><span class="tok-punc">{</span><span class="tok-punc">}</span></code></li>
+</ul>
+<h3 id="85-size-field-semantics">8.5 Size field semantics</h3>
+<p>The <code>size</code> field indicates the expandability and size of a variable:</p>
+<ul>
+  <li><code>size == 0</code>: The variable is not expandable (e.g., primitive types or empty collections). No further expansion is needed.</li>
+  <li><code>size &gt; 0</code>: The variable is expandable and has a known number of children/elements (e.g., arrays with known length).</li>
+  <li><code>size &lt; 0</code>: The variable is expandable but the number of children/elements is unknown; use <code>get_property</code> to retrieve the actual size when expanding. This value is allowed in <code>get_scope</code> and <code>get_evaluation</code> responses, but NOT in <code>get_property</code> responses, where <code>size</code> MUST be &gt;= 0.</li>
+</ul>
+<hr />
+<h2 id="9-ordering-state-and-resilience">9. Ordering, state, and resilience</h2>
+<h3 id="91-conceptual-remote-state">9.1 Conceptual remote state</h3>
+<p>The remote runtime is conceptually in one of:</p>
+<ul>
+  <li><code>running</code></li>
+  <li><code>stopped</code></li>
+  <li><code>exited</code></li>
+</ul>
+<p>State transitions are communicated via events:</p>
+<ul>
+  <li><code>running</code> → <code>stopped</code>: <code>event=stopped</code></li>
+  <li><code>stopped</code> → <code>running</code>: <code>event=continued</code></li>
+  <li><code>any → exited</code>: <code>event=program_exited</code></li>
+</ul>
+<h3 id="92-run-control-serialization-consumer-behavior">9.2 Run-control serialization (consumer behavior)</h3>
+<p>The VSX-side consumer serializes <strong>run-control</strong> commands:</p>
+<ul>
+  <li>Run-control commands are: <code>pause</code>, <code>continue</code>, <code>step</code>.</li>
+  <li>At most <strong>one</strong> run-control command is considered in-flight at a time.</li>
+  <li>The in-flight gate is cleared when the consumer observes:</li>
+  <li><code>event=stopped</code>, or</li>
+  <li><code>event=continued</code>, or</li>
+  <li><code>event=program_exited</code>, or</li>
+  <li>a <code>response</code> for the in-flight run-control command.</li>
+</ul>
+<p>Guidance for remote runtimes:</p>
+<ul>
+  <li>Remotes SHOULD emit the corresponding state event promptly once a run-control request is accepted.</li>
+</ul>
+<h3 id="921-run-control-state-matrix-recommended">9.2.1 Run-control state matrix (recommended)</h3>
+<p>This section clarifies how the remote runtime SHOULD behave when receiving run-control commands in different remote states.</p>
+<p>Remote states:</p>
+<ul>
+  <li><code>running</code></li>
+  <li><code>stopped</code></li>
+  <li><code>exited</code></li>
+</ul>
+<p>Notes:</p>
+<ul>
+  <li><code>success:true</code> in a response means the request was accepted (or at least not rejected immediately). It does not, by itself, imply a state transition has already occurred.</li>
+  <li>State transitions MUST be represented by events (<code>continued</code>, <code>stopped</code>, <code>program_exited</code>).</li>
+  <li><code>stop</code> is special in this project: it ends the debug session and VSX will disconnect immediately; the remote process MAY keep running.</li>
+</ul>
+<table>
+  <thead><tr>
+    <th> Command</th>
+    <th>Allowed when <code>running</code></th>
+    <th>Allowed when <code>stopped</code></th>
+    <th>Allowed when <code>exited</code></th>
+    <th>If accepted</th>
+    <th>If rejected</th>
+    <th>Consumer notes </th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td> <code>continue</code></td>
+    <td>yes (idempotent)</td>
+    <td>yes</td>
+    <td>no</td>
+    <td>respond <code>success:true</code>, then emit <code>event=continued</code></td>
+    <td>respond <code>success:false</code> + <code>message</code></td>
+    <td>consumer clears run-control in-flight on response or <code>continued</code> </td>
+  </tr>
+  <tr>
+    <td> <code>step</code></td>
+    <td>no</td>
+    <td>yes</td>
+    <td>no</td>
+    <td>respond <code>success:true</code>, then emit <code>event=stopped(reason=step)</code></td>
+    <td>respond <code>success:false</code> + <code>message</code></td>
+    <td>consumer clears run-control in-flight on response or <code>stopped</code> </td>
+  </tr>
+  <tr>
+    <td> <code>pause</code> (optional)</td>
+    <td>yes</td>
+    <td>yes (idempotent)</td>
+    <td>no</td>
+    <td>respond <code>success:true</code>, then emit <code>event=stopped(reason=pause)</code></td>
+    <td>respond <code>success=false</code> + <code>message</code></td>
+    <td>consumer may treat any <code>pause</code> response with <code>success:false</code> as unsupported for the session </td>
+  </tr>
+  <tr>
+    <td> <code>stop</code></td>
+    <td>yes</td>
+    <td>yes</td>
+    <td>yes</td>
+    <td>(no remote messages required)</td>
+    <td>n/a</td>
+    <td>VSX disconnects immediately; do not rely on sending any response/event </td>
+  </tr>
+  </tbody>
+</table>
+<h3 id="93-required-feature-behavior">9.3 Required feature behavior</h3>
+<p>Inspection commands are <strong>required</strong> features. Runtimes MUST respond to these commands or reject them with <code>success=false</code> + <code>message:&quot;unsupported&quot;</code> to prevent VSX from hanging while waiting for responses.</p>
+<p>Recommended behavior for unsupported inspection commands:</p>
+<ul>
+  <li>Prefer responding with <code>success=false</code> and <code>message:&quot;unsupported&quot;</code> so the consumer can deterministically disable the feature.</li>
+  <li>Alternatively, a remote MAY ignore an unsupported inspection request (send no response). This is supported for backwards compatibility but may cause UI timeouts/retries.</li>
+</ul>
+<h3 id="94-responses-vs-events-implementation-guidance">9.4 Responses vs events (implementation guidance)</h3>
+<p>This protocol uses both request/response and asynchronous events:</p>
+<ul>
+  <li>A <code>response</code> answers a specific <code>request</code> (via <code>requestSeq</code>) and indicates whether the request was accepted (<code>success:true</code>) or rejected (<code>success:false</code>),</li>
+  <li>An <code>event</code> represents a state transition or asynchronous notification (e.g., <code>continued</code>, <code>stopped</code>, <code>output</code>).</li>
+</ul>
+<p>Guidance:</p>
+<ul>
+  <li>For run-control commands (<code>continue</code>, <code>step</code>, <code>pause</code>), the remote SHOULD send a <code>response</code> promptly and then emit the corresponding state event when it actually occurs.</li>
+  <li>Do not encode state transitions inside <code>response</code> messages. The consumer relies on <code>event=continued/stopped/program_exited</code> to drive its state machine.</li>
+  <li><code>stop</code> ends the VSX debug session and causes immediate disconnect. The remote SHOULD NOT send any messages in response to <code>stop</code>.</li>
+  <li>A transport disconnect ends the debug session but does not imply the remote program exited. Only <code>event=program_exited</code> indicates remote exit.</li>
+</ul>
+<h3 id="95-forward-compatibility-rules">9.5 Forward-compatibility rules</h3>
+<p>To preserve compatibility as the protocol evolves:</p>
+<ul>
+  <li>Consumers SHOULD ignore unknown JSON object fields.</li>
+  <li>If a consumer receives an unknown <code>command</code> in a <code>type=request</code>, it SHOULD respond with <code>success=false</code> and a non-empty <code>message</code> (e.g., <code>&quot;unsupported&quot;</code>).</li>
+  <li>If a consumer receives an unknown <code>event</code> in a <code>type=event</code>, it SHOULD ignore it.</li>
+</ul>
+<h3 id="96-timeouts-retries-and-no-response-behavior-not-supported">9.6 Timeouts, retries, and no-response behavior (NOT SUPPORTED)</h3>
+<p>This protocol does not define any required timeout, retry, or retransmission behavior.</p>
+<ul>
+  <li>Producers SHOULD respond promptly, but consumers MUST NOT rely on retries for correctness.</li>
+  <li>If a request receives no response (e.g., due to transport issues or a non-responsive remote), the intended mitigation is to end the debug session and start debugging again.</li>
+</ul>
+<hr />
+<h2 id="10-examples">10. Examples</h2>
+<p>All examples are single JSON lines.</p>
+<h3 id="101-start">10.1 Start</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;start&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;start&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span> <span class="tok-punc">}</span></code></p>
+<h3 id="1011-start-failed-failure-response-example">10.1.1 Start failed (failure response example)</h3>
+<p>Example: start fails due to internal error in the remote runtime:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">16</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;start&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">16</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;start&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;internal error&quot;</span> <span class="tok-punc">}</span></code></p>
+<h3 id="102-ready-handshake-no-response">10.2 Ready handshake (no response)</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">6</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;ready&quot;</span> <span class="tok-punc">}</span></code></p>
+<p>(transport stays open; remote begins emitting queued events once ready is observed)</p>
+<h3 id="103-stop-no-response-required">10.3 Stop (no response required)</h3>
+<p>Example: stop request followed by VSX closing the transport; no remote messages are required and the remote program may keep running while the runtime resets its debug state and waits for a future connection:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">18</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;stop&quot;</span> <span class="tok-punc">}</span></code></p>
+<p>(transport disconnects)</p>
+<h3 id="104-continue">10.4 Continue</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;continue&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;continue&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;continued&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span> <span class="tok-punc">}</span></code></p>
+<h3 id="1041-continue-failed-failure-response-example">10.4.1 Continue failed (failure response example)</h3>
+<p>Example: continue fails because the program has already exited:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">17</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;continue&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">17</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;continue&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;invalid state<span class="tok-punc">:</span> program exited&quot;</span> <span class="tok-punc">}</span></code></p>
+<h3 id="105-step">10.5 Step</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">3</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;step&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;stepKind&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;STEP_INTO&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;stepUnit&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;STEP_LINE&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">3</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;step&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;stopped&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;reason&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;step&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Program.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">13</span> <span class="tok-punc">}</span></code></p>
+<h3 id="1051-step-rejected-failure-response-example">10.5.1 Step rejected (failure response example)</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">5</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;step&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;stepKind&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;STEP_INTO&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;stepUnit&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;STEP_LINE&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">5</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;step&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;invalid state<span class="tok-punc">:</span> not stopped&quot;</span> <span class="tok-punc">}</span></code></p>
+<h3 id="106-pause-unsupported">10.6 Pause unsupported</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;pause&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;pause&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;unsupported&quot;</span> <span class="tok-punc">}</span></code></p>
+<h3 id="1061-pause-success-supported-runtime">10.6.1 Pause success (supported runtime)</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">19</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;pause&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">19</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;pause&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;stopped&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;reason&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;pause&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Program.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">25</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;stopped&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;reason&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;pause&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Worker.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">42</span> <span class="tok-punc">}</span></code></p>
+<h3 id="107-program-exited-event">10.7 Program exited event</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;program_exited&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;exitCode&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span></code></p>
+<h3 id="108-thread-lifetime-events">10.8 Thread lifetime events</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;thread_started&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">11</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;thread_exited&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">11</span> <span class="tok-punc">}</span></code></p>
+<h3 id="109-breakpoint-hit">10.9 Breakpoint hit</h3>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;stopped&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;reason&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;breakpoint&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Program.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">12</span> <span class="tok-punc">}</span></code></p>
+<h4 id="1091-set_breakpoint-success-create-update-examples">10.9.1 set_breakpoint success (create + update examples)</h4>
+<p>Example: set a new breakpoint (create):</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">27</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_breakpoint&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Program.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">12</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;function&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;functionLineOffset&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;enabled&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;conditionType&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;none&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;condition&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;&quot;</span> <span class="tok-punc">}</span></code></p>
+<p>Example: update the same breakpoint (e.g., add a condition):</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">28</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_breakpoint&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Program.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">12</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;function&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;functionLineOffset&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;enabled&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;conditionType&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;expression&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;condition&quot;</span></span><span class="tok-punc">:</span>&quot;i &gt; <span class="tok-num">10</span>&quot; <span class="tok-punc">}</span></code></p>
+<p>Example: set a new breakpoint (create) using a solution subdirectory path:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">27</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_breakpoint&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;src/Game/Player.as&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">12</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;function&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;functionLineOffset&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;enabled&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;conditionType&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;none&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;condition&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;&quot;</span> <span class="tok-punc">}</span></code></p>
+<p>Example: update the same breakpoint (e.g., add a condition) using a solution subdirectory path:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">28</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_breakpoint&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;src/Game/Player.as&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">12</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;function&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;functionLineOffset&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;enabled&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;conditionType&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;expression&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;condition&quot;</span></span><span class="tok-punc">:</span>&quot;i &gt; <span class="tok-num">10</span>&quot; <span class="tok-punc">}</span></code></p>
+<h4 id="1092-set_breakpoint-failed-failure-surface-example">10.9.2 set_breakpoint failed (failure surface example)</h4>
+<p>If the remote cannot honor a request it SHOULD emit an <code>output</code> event rather than a response:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">21</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_breakpoint&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Missing.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">10</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;function&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;functionLineOffset&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;enabled&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;conditionType&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;none&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;condition&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;output&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;category&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;error&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;output&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_breakpoint failed<span class="tok-punc">:</span> file not found C<span class="tok-punc">:</span>/repo/app/Missing.cs&quot;</span> <span class="tok-punc">}</span></code></p>
+<h4 id="1093-remove_breakpoint-failed-failure-surface-example">10.9.3 remove_breakpoint failed (failure surface example)</h4>
+<p>Example: breakpoint location does not exist:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">20</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;remove_breakpoint&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Program.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">12</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;output&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;category&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;warn&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;output&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;remove_breakpoint failed<span class="tok-punc">:</span> not found (C<span class="tok-punc">:</span>/repo/app/Program.cs<span class="tok-punc">:</span><span class="tok-num">12</span>)&quot;</span> <span class="tok-punc">}</span></code></p>
+<h4 id="1094-exception-stop-example">10.9.4 Exception stop example</h4>
+<p>Example: runtime reports an unhandled exception and surfaces details in both the <code>stopped</code> event and an <code>output</code> line.</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;stopped&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;reason&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;exception&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Worker.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">58</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;exceptionName&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;System.NullReferenceException&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;exceptionMessage&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;Object reference not set to an instance of an object.&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;event&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;event&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;output&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;category&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;error&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;output&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;Unhandled exception in Worker.Run<span class="tok-punc">:</span> System.NullReferenceException&quot;</span> <span class="tok-punc">}</span></code></p>
+<h3 id="1010-inspection-command-walkthrough">10.10 Inspection command walkthrough</h3>
+<p>The following JSON lines show a typical inspection flow once the program is stopped.</p>
+<h4 id="10101-enumerate-threads">10.10.1 Enumerate threads</h4>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">60</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_threads&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">60</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_threads&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threads&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;id&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Main Thread&quot;</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;id&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Worker #<span class="tok-num">1</span>&quot;</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<h4 id="10102-fetch-stack-and-scope">10.10.2 Fetch stack and scope</h4>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">61</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_stack&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">61</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_stack&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frames&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;id&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Worker.Run&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/app/Worker.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">42</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;id&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Task.InnerInvoke&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;file&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;C<span class="tok-punc">:</span>/repo/framework/Task.cs&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;line&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">119</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">62</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_scope&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">62</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_scope&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;variables&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329216</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;i&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">11</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329250</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;task&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-punc">{</span>...<span class="tok-punc">}</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Task@&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4194307</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">-1</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">73</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_scope&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">73</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_scope&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;variables&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329400</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-punc">[</span>...<span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> &quot;array&lt;int&gt;<span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>typeId<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">2002</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>size<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">5</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>start<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>count<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">3</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>elements<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr">&quot;</span>addr<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">1407329401</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>name<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>buffer<span class="tok-punc">[</span><span class="tok-num">0</span><span class="tok-punc">]</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>value<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span><span class="tok-num">1</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>type<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>int<span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>typeId<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>size<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr">&quot;</span>addr<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">1407329402</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>name<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>buffer<span class="tok-punc">[</span><span class="tok-num">1</span><span class="tok-punc">]</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>value<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span><span class="tok-num">2</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>type<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>int<span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>typeId<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>size<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr">&quot;</span>addr<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">1407329403</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>name<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>buffer<span class="tok-punc">[</span><span class="tok-num">2</span><span class="tok-punc">]</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>value<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span><span class="tok-num">3</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>type<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>int<span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>typeId<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>size&quot;</span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">67</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_stack&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">99</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">67</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_stack&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;thread not found<span class="tok-punc">:</span> <span class="tok-num">99</span>&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">69</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_scope&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">99</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">69</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_scope&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Invalid frameId=<span class="tok-num">99</span>&quot;</span> <span class="tok-punc">}</span></code></p>
+<h4 id="10103-expand-properties">10.10.3 Expand properties</h4>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">63</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329250</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4194307</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">63</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329250</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4194307</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;properties&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329300</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Status&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;RanToCompletion&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;TaskStatus&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1001</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329312</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Result&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">42</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">64</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329250</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4194307</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">64</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">123</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4194307</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;invalid varAddr<span class="tok-punc">:</span> <span class="tok-num">123</span>&quot;</span> <span class="tok-punc">}</span></code></p>
+<h4 id="101031-expand-array-properties">10.10.3.1 Expand array properties</h4>
+<p>Example: expanding an array variable to retrieve its elements:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">74</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329400</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2002</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">5</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">74</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329400</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2002</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">5</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">5</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;properties&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329401</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">0</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">1</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329402</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">1</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">2</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329403</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">2</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">3</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329404</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">3</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">4</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329405</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">4</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">5</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<h4 id="101032-expand-array-properties-with-paging">10.10.3.2 Expand array properties with paging</h4>
+<p>Example: expanding a large array with paging to retrieve elements in chunks:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">75</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329400</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2002</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">3</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">75</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329400</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2002</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">3</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">10</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;properties&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329401</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">0</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">1</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329402</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">1</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">2</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329403</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">2</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">3</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">76</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329400</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2002</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">3</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">3</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">76</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329400</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2002</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">3</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">3</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">10</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;properties&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329404</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">3</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">4</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329405</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">4</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">5</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329406</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">5</span><span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">6</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<h4 id="101033-handling-unknown-size-size-0">10.10.3.3 Handling unknown size (size &lt; 0)</h4>
+<p>Example: expanding a variable initially reported with unknown size (<code>size &lt; 0</code>), then retrieving the actual size via <code>get_property</code>:</p>
+<p>First, from <code>get_scope</code> or <code>get_evaluation</code>:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">62</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_scope&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;variables&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329250</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;task&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-punc">{</span>...<span class="tok-punc">}</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Task@&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4194307</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">-1</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<p>Then, <code>get_property</code> request:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">77</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329250</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4194307</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span></code></p>
+<p>Response with actual size:</p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">77</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_property&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329250</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">4194307</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;start&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;count&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;properties&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329300</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Status&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;RanToCompletion&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;TaskStatus&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1001</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329312</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Result&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">42</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;int&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span></code></p>
+<h4 id="10104-set-a-variable">10.10.4 Set a variable</h4>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">70</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_variable&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329216</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">12</span>&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">70</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_variable&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329216</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">71</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_variable&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">99</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329216</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-num">12</span>&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">71</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;set_variable&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;Invalid frameId=<span class="tok-num">99</span>&quot;</span> <span class="tok-punc">}</span></code></p>
+<h4 id="10105-get-evaluation-an-expression">10.10.5 Get Evaluation an expression</h4>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">65</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_evaluation&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;expression&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;task.Status&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">65</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_evaluation&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;expression&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;task.Status&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;result&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329216</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;task.Status&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;RanToCompletion&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;TaskStatus&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;typeId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1001</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;size&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">66</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_evaluation&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;expression&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">66</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_evaluation&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">true</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;expression&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;result&quot;</span></span><span class="tok-punc">:</span> <span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;addr&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">1407329500</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;name&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;value&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;<span class="tok-punc">[</span>...<span class="tok-punc">]</span>&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span> &quot;array&lt;int&gt;<span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>typeId<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">2002</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>size<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">5</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>start<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>count<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">3</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>elements<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-punc">[</span> <span class="tok-punc">{</span> <span class="tok-keystr">&quot;</span>addr<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">1407329501</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>name<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>buffer<span class="tok-punc">[</span><span class="tok-num">0</span><span class="tok-punc">]</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>value<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span><span class="tok-num">10</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>type<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>int<span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>typeId<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>size<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr">&quot;</span>addr<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">1407329502</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>name<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>buffer<span class="tok-punc">[</span><span class="tok-num">1</span><span class="tok-punc">]</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>value<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span><span class="tok-num">20</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>type<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>int<span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>typeId<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>size<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span><span class="tok-punc">,</span> <span class="tok-punc">{</span> <span class="tok-keystr">&quot;</span>addr<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">1407329503</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>name<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>buffer<span class="tok-punc">[</span><span class="tok-num">2</span><span class="tok-punc">]</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>value<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span><span class="tok-num">30</span><span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>type<span class="tok-str">&quot;</span><span class="tok-punc">:</span> &quot;</span>int<span class="tok-str">&quot;<span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>typeId<span class="tok-str">&quot;</span><span class="tok-punc">:</span> <span class="tok-num">2</span><span class="tok-punc">,</span> <span class="tok-keystr">&quot;</span>size&quot;</span><span class="tok-punc">:</span> <span class="tok-num">0</span> <span class="tok-punc">}</span> <span class="tok-punc">]</span> <span class="tok-punc">}</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;request&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;seq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">72</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_evaluation&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;threadId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">7</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;frameId&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">0</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;expression&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer<span class="tok-punc">[</span><span class="tok-num">0</span><span class="tok-punc">]</span>&quot;</span> <span class="tok-punc">}</span></code></p>
+<p><code class="json-colored"><span class="tok-punc">{</span> <span class="tok-keystr"><span class="tok-str">&quot;type&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;response&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;requestSeq&quot;</span></span><span class="tok-punc">:</span> <span class="tok-num">72</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;command&quot;</span></span><span class="tok-punc">:</span><span class="tok-str">&quot;get_evaluation&quot;</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;success&quot;</span></span><span class="tok-punc">:</span> <span class="tok-lit">false</span><span class="tok-punc">,</span> <span class="tok-keystr"><span class="tok-str">&quot;message&quot;</span></span><span class="tok-punc">:</span> <span class="tok-str">&quot;buffer is <span class="tok-lit">null</span>&quot;</span> <span class="tok-punc">}</span></code></p>
+<hr />
+<h2 id="11-conformance-checklist">11. Conformance checklist</h2>
+<h3 id="111-general">11.1 General</h3>
+<ul>
+  <li>[ ] All JSON messages are well-formed and valid UTF-8.</li>
+  <li>[ ] Conformance to protocol rules on JSON object fields: unknown fields are ignored.</li>
+  <li>[ ] Conformance to protocol rules on request/response: no unsolicited responses.</li>
+  <li>[ ] Conformance to protocol rules on events: no missing or extra fields.</li>
+</ul>
+<h3 id="112-run-control">11.2 Run-control</h3>
+<ul>
+  <li>[ ] <code>start</code> waits for <code>event=continued</code> before accepting new run-control requests.</li>
+  <li>[ ] <code>stop</code> terminates the session immediately; no response or events.</li>
+  <li>[ ] <code>continue</code> in <code>stopped</code> state is idempotent; emits <code>event=continued</code> once.</li>
+  <li>[ ] <code>step</code> in <code>stopped</code> state is accepted and emits <code>event=stopped(reason=step)</code>.</li>
+  <li>[ ] <code>pause</code> in <code>running</code> or <code>stopped</code> state is accepted and emits <code>event=stopped(reason=pause)</code>.</li>
+  <li>[ ] <code>ready</code> is accepted without a response; remotes only start streaming buffered events after they see it.</li>
+</ul>
+<h3 id="113-breakpoints">11.3 Breakpoints</h3>
+<ul>
+  <li>[ ] <code>set_breakpoint</code> accepts <code>file</code> + <code>line</code>; any failures are emitted via <code>event=output</code> (no response required).</li>
+  <li>[ ] <code>remove_breakpoint</code> accepts <code>file</code> + <code>line</code>; failures are emitted via <code>event=output</code> (no response required).</li>
+  <li>[ ] Breakpoint stop emits <code>event=stopped(reason=breakpoint)</code> with canonical <code>file</code> and <code>line</code>.</li>
+</ul>
+<h3 id="114-inspection-required">11.4 Inspection (REQUIRED)</h3>
+<ul>
+  <li>[ ] The following inspection commands are supported and behave as specified:</li>
+  <li>[ ] <code>get_threads</code></li>
+  <li>[ ] <code>get_stack</code></li>
+  <li>[ ] <code>get_scope</code></li>
+  <li>[ ] <code>get_property</code></li>
+  <li>[ ] <code>get_evaluation</code></li>
+  <li>[ ] <code>set_variable</code></li>
+</ul>
+<h2 id="12-implementation-guidelines">12. Implementation Guidelines</h2>
+<h3 id="121-performance-considerations">12.1 Performance considerations</h3>
+<ul>
+  <li>Respond to inspection commands promptly to avoid UI timeouts (recommended &lt; 500ms for simple queries).</li>
+  <li>For large data structures, use paging (<code>start</code> and <code>count</code>) to limit response size and prevent UI lag.</li>
+  <li>Cache variable metadata where possible, but invalidate on state changes (e.g., after <code>continue</code> or <code>step</code>).</li>
+</ul>
+<h3 id="122-error-handling-best-practices">12.2 Error handling best practices</h3>
+<ul>
+  <li>Always include a descriptive <code>message</code> in failure responses.</li>
+  <li>For invalid <code>threadId</code> or <code>frameId</code>, respond with <code>success=false</code> and a clear message (e.g., &quot;thread not found&quot;).</li>
+  <li>Log internal errors but surface user-friendly messages (e.g., avoid exposing stack traces).</li>
+</ul>
+<h3 id="123-state-management">12.3 State management</h3>
+<ul>
+  <li>Track program state accurately and reject commands in invalid states (e.g., <code>step</code> when running).</li>
+  <li>Emit events immediately after state transitions to keep VSX synchronized.</li>
+  <li>Handle reconnections by resetting state and waiting for <code>start</code>/<code>ready</code>.</li>
+</ul>
+<h3 id="124-compatibility-and-extensibility">12.4 Compatibility and extensibility</h3>
+<ul>
+  <li>Ignore unknown fields in requests to allow protocol evolution.</li>
+  <li>Use <code>event=output</code> for diagnostics or warnings.</li>
+  <li>Test against the conformance checklist (&#167;11) to ensure full compatibility.</li>
+</ul>
+
+    <hr />
+    <p class="muted">Generated on 2026-01-18 21:53:55 (local time). Source of truth: <code>docs/RemoteProtocol.md</code>.</p>
+  </main>
+</body>
+</html>
