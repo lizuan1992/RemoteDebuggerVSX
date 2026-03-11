@@ -357,6 +357,16 @@ namespace RemoteAD7Engine
 
                 if (!IsLikelyExecutableSourceLine(normalizedFile, oneBasedLine))
                     pending.MarkPermanentlyDisabled("Breakpoint line is not executable.");
+
+                try
+                {
+                    var bound = new AD7BoundBreakpoint(this, pending);
+                    pending.AttachBoundBreakpoint(bound);
+                    Callback?.BoundBreakpoint(pending);
+                }
+                catch
+                {
+                }
             }
             catch
             {
